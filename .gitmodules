@@ -1,0 +1,3 @@
+[submodule "sqlite3_wrapper"]
+	path = sqlite3_wrapper
+	url = https://gist.github.com/goldsborough/c973d934f620e16678bf
