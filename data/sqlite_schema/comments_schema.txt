@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY NOT NULL,
+    videoId TEXT NOT NULL,
+    authorChannelId TEXT,
+    publishedAt TIMESTAMP NOT NULL,
+    likeCount INTEGER NOT NULL,
+    parentId TEXT,
+    textDisplay TEXT,
+    language TEXT,
+    keywords TEXT,
+    sentimentLabel TEXT,
+    sentimentScore REAL,
+    anger REAL,
+    disgust REAL,
+    fear REAL,
+    joy REAL,
+    sadness REAL
+);
