@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS comments (
     publishedAt TIMESTAMP NOT NULL,
     likeCount INTEGER NOT NULL,
     parentId TEXT,
-    textDisplay TEXT,
+    text TEXT,
     language TEXT,
     keywords TEXT,
     sentimentLabel TEXT,
