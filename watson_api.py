@@ -30,14 +30,15 @@ https://cloud.ibm.com/apidocs/natural-language-understanding?code=python
 import os
 import sys
 
+from tqdm import tqdm
 
-IBM_MASTER = os.path.dirname(os.path.abspath(__file__)) + '/python-sdk-master'
-if not IBM_MASTER in sys.path:
-    sys.path.append(IBM_MASTER)
+# IBM_MASTER = os.path.dirname(os.path.abspath(__file__)) + '/python-sdk-master'
+# if not IBM_MASTER in sys.path:
+#     sys.path.append(IBM_MASTER)
 
-IBM_CORE_MASTER = os.path.dirname(os.path.abspath(__file__)) + '/python-sdk-core-master'
-if not IBM_CORE_MASTER in sys.path:
-    sys.path.append(IBM_CORE_MASTER)
+# IBM_CORE_MASTER = os.path.dirname(os.path.abspath(__file__)) + '/python-sdk-core-master'
+# if not IBM_CORE_MASTER in sys.path:
+#     sys.path.append(IBM_CORE_MASTER)
 
 from ibm_watson import LanguageTranslatorV3, NaturalLanguageUnderstandingV1
 from ibm_watson.natural_language_understanding_v1 import Features, EmotionOptions
@@ -48,7 +49,7 @@ from ibm_watson.natural_language_understanding_v1 import Features, EmotionOption
 
 def get_emotions(df, api_key, nlu_base_url):
     """ Detects anger, disgust, fear, joy, or sadness that is conveyed in the contents
-    from a Pandas DataFrame
+    from a Pandas DataFrame's 'text' column.
     
     :param DataFrame df: DataFrame containing an 'id', 'text' and 'text_en' column
     :param str subscription_key: MS Azure subscription key
@@ -63,7 +64,7 @@ def get_emotions(df, api_key, nlu_base_url):
     )
     
     response_list = []
-    for row in df.itertuples():
+    for row in tqdm(df.itertuples(), total=df.shape[0]):
         try:
             response = natural_language_understanding.analyze(
                 text=row.text,
@@ -86,7 +87,7 @@ def get_emotions(df, api_key, nlu_base_url):
 
 
 def get_translations(df, api_key, lt_base_url):
-    """ Translate text from a Pandas DataFrame to English
+    """ Translate text from a Pandas DataFrame's 'text column to English.
     
     :param DataFrame df: DataFrame containing an 'id', 'text', and 'language' column
     :param str subscription_key: MS Azure subscription key
@@ -101,13 +102,14 @@ def get_translations(df, api_key, lt_base_url):
     )
     
     response_list = []
-    for row in df.itertuples():
+    for row in tqdm(df.itertuples(), total=df.shape[0]):
         try:
             response = language_translator.translate(
                 text=row.text,
                 model_id=f'{row.language}-en'
             ).get_result()
-            values = (response['translations'][0]['translation'], row.id)
+            values = (response['translations'][0]['translation'],
+                      row.id)
             response_list.append(values)
         except:
             values = ('N/A', row.id)
