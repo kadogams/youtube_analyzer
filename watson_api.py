@@ -6,18 +6,12 @@
 
 
 """
-Funtions to translate text via IBM Watson's Language Translator API and to analyse text via it's Natural Language Understanding API.
+Funtions to translate text via IBM Watson's Language Translator API
+and to analyse text via it's Natural Language Understanding API.
 
-requirements: pyjwt (conda install pyjwt)
-
-clone/download/fork repos from:
- - https://github.com/watson-developer-cloud/python-sdk
- - https://github.com/IBM/python-sdk-core
-
-in python-sdk/ibm_watson/__init__.py: comment everything but:
- - ibm_cloud_sdk_core (line 16)
- - language_translator_v3 (line 21)
- - natural_language_understanding_v1 (line 23)
+requirements:
+ - ibm-watson
+ - tqdm
 
 more info at:
 https://cloud.ibm.com/apidocs/natural-language-understanding?code=python
@@ -63,8 +57,10 @@ def get_emotions(df, api_key, nlu_base_url):
         url=nlu_base_url
     )
     
-    response_list = []
-    for row in tqdm(df.itertuples(), total=df.shape[0]):
+    value_list = []
+    progress_bar = tqdm(df.itertuples(), total=df.shape[0])
+    progress_bar.set_description('Updating emotions')
+    for row in progress_bar:
         try:
             response = natural_language_understanding.analyze(
                 text=row.text,
@@ -79,11 +75,11 @@ def get_emotions(df, api_key, nlu_base_url):
                       emotions['joy'],
                       emotions['sadness'],
                       row.id)
-            response_list.append(values)
+            value_list.append(values)
         except:
             values = ('N/A', 'N/A', 'N/A', 'N/A', 'N/A', row.id)
-            response_list.append(values)
-    return response_list
+            value_list.append(values)
+    return value_list
 
 
 def get_translations(df, api_key, lt_base_url):
@@ -101,8 +97,10 @@ def get_translations(df, api_key, lt_base_url):
         url=lt_base_url
     )
     
-    response_list = []
-    for row in tqdm(df.itertuples(), total=df.shape[0]):
+    value_list = []
+    progress_bar = tqdm(df.itertuples(), total=df.shape[0])
+    progress_bar.set_description('Updating emotions')
+    for row in progress_bar:
         try:
             response = language_translator.translate(
                 text=row.text,
@@ -110,11 +108,11 @@ def get_translations(df, api_key, lt_base_url):
             ).get_result()
             values = (response['translations'][0]['translation'],
                       row.id)
-            response_list.append(values)
+            value_list.append(values)
         except:
             values = ('N/A', row.id)
-            response_list.append(values)
-    return response_list
+            value_list.append(values)
+    return value_list
 
 
 # %%
