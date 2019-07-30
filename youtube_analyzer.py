@@ -12,17 +12,13 @@ Database schema available at 'data/sqlite_schema/sqlite_diagram.png'
 requirements:
  - google-api-python-client
  - ibm-watson
- - langdetect
  - pandas
+ - tqdm
 
 API keys required for the following methods:
  - self.search(): Google API
  - self.run_analysis(): Microsoft Azure Text Analytics API
                         IBM Watson Natural Language Understanding API
-
-To authenticate to google.cloud please refer to (if not set,
-the open source library 'langdetect' will be used):
-https://cloud.google.com/docs/authentication/getting-started
 """
 
 
@@ -38,12 +34,12 @@ from time import sleep
 import pandas as pd
 from tqdm import tqdm
 
-# from googleapiclient.discovery import build
-# from google.cloud import translate
+from googleapiclient.discovery import build
+from google.cloud import translate
 
 from .sqlite3_wrapper.database import Database
-# from .azure_api import get_key_phrases, get_languages, get_sentiments
-# from .watson_api import get_emotions
+from .azure_api import get_key_phrases, get_languages, get_sentiments
+from .watson_api import get_emotions
 
 
 # In[ ]:
@@ -58,7 +54,9 @@ MAX_COMMENT_THREADS = 100
 RESULT_ORDERS = ['date', 'rating', 'relevance', 'title', 'videoCount', 'viewCount']
 COMMENT_ORDERS = ['time', 'relevance']
 
-# MS Azure (supported languages for both sentiment analysis and key phrases extraction)
+# MS Azure
+AZURE_MAX_DOCUMENTS = 1000
+# supported languages for both sentiment analysis and key phrases extraction:
 AZURE_SUPPORTED_LANG = ['da', 'nl', 'en', 'fi', 'fr', 'de', 'it', 'no', 'pl', 'pt', 'ru', 'es', 'sv']
 
 # IBM Watson (supported languages for emotion analysis)
@@ -86,7 +84,6 @@ class youtubeAnalyzer(Database):
         :param str googleApiKey: Developper key for Google API
         :param str azureApiKey: Subscription key for Azure Text Analytics API
         :param str watsonApiKey: API key for IBM Watson's Natural Language Understanding API
-        :param str jiveBaseUrl: WAP url
         :param str azureBaseUrl: Base url for Azure Text Analytics API
         :param str watsonBaseUrl_nlu: Base url for IBM Watson's Natural Language Understanding API
         :param str conflict_resolution: ON CONFLICT clause for the SQLite queries. Warning: 'REPLACE' will delete the all Azure and Watson analysis.
@@ -119,12 +116,13 @@ class youtubeAnalyzer(Database):
         Database.__init__(self, name=self.dir) # init self.conn and self.cursor
         if self.conn is not None:
             print('***** YouTube database directory: {} *****'.format(self.dir))
-
-
+    
+   
+    
     ##################
     # Public Methods #
     ##################
-
+    
     def create_structure(self):
         """ Create the wap SQLite database structure (cf. data/sqlite_schema/sqlite_diagram.png).
         SQL 'CREATE TABLE' statements available in 'data/sqlite_schema/*_schema.txt'
@@ -154,8 +152,8 @@ class youtubeAnalyzer(Database):
             self.conn.commit()
         else:
             print("Error: Cannot create the database connection.")
-
-
+    
+    
     def display_schema(self):
         """ Print the database schemas
         """
@@ -166,8 +164,8 @@ class youtubeAnalyzer(Database):
         tables = self.cursor.fetchall()
         for table in tables:
             print(*table, '\n')
-
-
+    
+    
     def get_comments_df(self, video_search=None, video_separator='OR',
                         channel_search=None, channel_separator='OR',
                         from_date=None, to_date=None):
@@ -211,22 +209,24 @@ class youtubeAnalyzer(Database):
         df = pd.read_sql_query(sql, self.conn)
         df['publishedAt'] = pd.to_datetime(df['publishedAt'])
         return df
-
-
+    
+    
     def run_analysis(self):
         """ Run a sentiment analysis on the comments of the SQLite database
         via MS Azure Text Analytics and an emotion analysis via
         IBM Watson NLU if their detected language is supported by the APIs.
         The analysis is stored in the SQLite database.
         """
-        self._update_language()
-#         self._update_sentiments()
-#         self._update_keywords()
-#         self._update_emotions()
+        self._update_languages()
+        self._update_sentiments()
+        self._update_keywords()
+        self._update_emotions()
         self.conn.commit()
-
-
-    def search(self, query, n_results=5, n_comments=100, result_order='relevance', comment_order='relevance'):
+        print('Analysis complete.')
+    
+    
+    def search(self, query, n_results=20, result_order='relevance',
+               n_comments=100, comment_order='relevance', include_replies=False):
         """ Search specified videos on YouTube, and update the local database accordingly
         with a sentiment and emotion analysis on the associated comments.
         
@@ -236,9 +236,10 @@ class youtubeAnalyzer(Database):
         
         :param str query: Query term to search for
         :param int n_results: Number of search results desired
-        :param int n_comments: Number of comment threads per video desired
         :param str result_order: Order of the search results in the API response
+        :param int n_comments: Number of comment threads per video desired
         :param str comment_order: Order of the comment threads in the API response
+        :param bool include_replies: Include replies to the comments, if any
         """
         if self.youtube == None:
             try:
@@ -256,35 +257,40 @@ class youtubeAnalyzer(Database):
                              "the given value is invalid: '{}'"
                              .format("', '".join(COMMENT_ORDERS), comment_order))
         
+        response_list = []
         page_token = None
-        progression_bar = tqdm(range(0, n_results, MAX_SEARCH))
-        progression_bar.set_description('Searching videos')
-        for n in progression_bar:
+        for n in range(0, n_results, MAX_SEARCH):
             # Maximum number of search results per page: 50
-            max_results = n_results - n if n_results - n <= MAX_SEARCH else MAX_SEARCH
-            search_response = self.youtube.search().list(
-                part='snippet',
-                maxResults=max_results,
-                order=result_order, # You may consider using 'viewCount'
-                pageToken=page_token,
-                q=query,
-                safeSearch='none',
-                type='video', # Channels might appear in search results
-            ).execute()
-            self._insert_videos(search_response)
-           
+            max_results = MAX_SEARCH if n_results - n > MAX_SEARCH else n_results - n
+            try:
+                search_response = self.youtube.search().list(
+                    part='snippet',
+                    maxResults=max_results,
+                    order=result_order, # You may consider using 'viewCount'
+                    pageToken=page_token,
+                    q=query,
+                    safeSearch='none',
+                    type='video', # Channels might appear in search results
+                ).execute()
+            except Exception as e:
+                print(f"An error occured during a search request on YouTube API:", e)
+                continue
+            response_list.append(search_response)
+            
             if not 'nextPageToken' in search_response:
                 break
             page_token = search_response['nextPageToken']
-    
-        self._get_comments(n_comments, comment_order)
+        
+        videoId_list = self._insert_videos(response_list, n_results)
+        self._get_comments(videoId_list, n_comments, comment_order, include_replies)
         self.conn.commit()
-
-
+        print(f"Search results stored in '{self.dir}'")
+    
+    
     ###################
     # Private Methods #
     ###################
-
+        
     def _format_comment_resource(self, comment_resource):
         """ Format the comment resource into a list of tuples
         for the SQLite query.
@@ -293,7 +299,8 @@ class youtubeAnalyzer(Database):
         :return: Specific values of the comment resource
         :rtype: list
         """
-        if 'authorChannelId' in comment_resource['snippet']           and 'value' in comment_resource['snippet']['authorChannelId']:
+        if 'authorChannelId' in comment_resource['snippet'] \
+          and 'value' in comment_resource['snippet']['authorChannelId']:
             authorChannelId = comment_resource['snippet']['authorChannelId']['value']
             self._insert_channel(authorChannelId)
         else:
@@ -309,8 +316,8 @@ class youtubeAnalyzer(Database):
             comment_resource['snippet']['textDisplay']
         )
         return values
-
-
+    
+    
     def _format_datetime_condition(self, from_date, to_date):
         """ Return a condition for the SQLite 'WHERE' clause with the specified datetime range
 
@@ -327,7 +334,7 @@ class youtubeAnalyzer(Database):
             to_date = 'now'
         return "(contents.published BETWEEN '{}' AND '{}')".format(str(pd.to_datetime(from_date)),
                                                                    str(pd.to_datetime(to_date)))
-
+    
 
     def _format_search_condition(self, video_search, video_separator, channel_search, channel_separator):
         """ Return a condition for the SQLite 'WHERE' clause with the specified search query.
@@ -360,44 +367,50 @@ class youtubeAnalyzer(Database):
             return conditions.pop()
         return '({})'.format(' OR '.join(conditions))
 
-
-    def _get_comments(self, n_comments, comment_order):
+    
+    def _get_comments(self, videoId_list, n_comments, comment_order, include_replies):
         """ Get the comment threads to the videos found with the search request.
         
+        :paran list videoId_list: Ids of the comments' parent video
         :param int n_comments: Number of comment threads per video desired
         :param str order: Order of the resources in the API response
+        :param bool include_replies: Include replies to the comments, if any
         """
-        self.query('SELECT id FROM videos')
-        videoId_list = self.cursor.fetchall()
+        if include_replies == False:
+            part = 'snippet'
+        else:
+            part = 'snippet,replies'
         
-        for videoId in videoId_list:
-
+        progress_bar = tqdm(videoId_list)
+        progress_bar.set_description('Fetching comment threads by video')
+        for videoId in progress_bar:
+            
+            response_list = []
             page_token = None
-            progression_bar = tqdm(range(0, n_comments, MAX_COMMENT_THREADS))
-            progression_bar.set_description('Fetching comment threads')
-            for n in progression_bar:
+            for n in range(0, n_comments, MAX_COMMENT_THREADS):
                 # Maximum number of comment threads per page: 100
-                max_comments = n_comments - n if n_comments - n <= MAX_COMMENT_THREADS else MAX_COMMENT_THREADS
-                
+                max_comments = MAX_COMMENT_THREADS if n_comments - n > MAX_COMMENT_THREADS else n_comments - n
                 try:
                     comment_response = self.youtube.commentThreads().list(
-                        part='snippet,replies',
+                        part=part,
                         maxResults=max_comments,
                         order=comment_order,
                         pageToken=page_token,
                         textFormat = 'plainText',
-                        videoId=videoId[0],
+                        videoId=videoId,
                     ).execute()
                 except Exception as e:
                     print(f"An error occured during the commmentThreads request of videoId '{videoId}':", e)
                     continue
-                self._insert_comments(comment_response)
-            
+                response_list.append(comment_response)
+                
                 if not 'nextPageToken' in comment_response:
                     break
                 page_token = comment_response['nextPageToken']
+            
+            self._insert_comments(response_list, n_comments)
 
-
+    
     def _init_youtube(self):
         # Disable OAuthlib's HTTPS verification when running locally.
         # *DO NOT* leave this option enabled in production.
@@ -410,7 +423,7 @@ class youtubeAnalyzer(Database):
             api_version,
             developerKey=self.googleApiKey
         )
-
+    
 
     def _insert_channel(self, channelId):
         """ Insert the specified channel's info into the SQLite 'channels' table.
@@ -440,57 +453,71 @@ class youtubeAnalyzer(Database):
             if not values:
                 return
             self.cursor.execute(sql, values)
-
-
-    def _insert_comments(self, comment_response):
+    
+    
+    def _insert_comments(self, response_list, n_comments):
         """ Insert the collection of comment threads into the SQLite 'comments' table.
         
-        :param dict comment_ressource: Response to the commentThreads request
+        :param list response_list: Responses to the commentThreads request
+        :param int n_comments: Number of comment threads per video desired
         """
-        if not 'items' in comment_response:
-            return
-                
         value_list = []
-        for item in comment_response['items']:
-            values = self._format_comment_resource(item['snippet']['topLevelComment'])
-            value_list.append(values)
-            if 'replies' in item:
-                for comment in item['replies']['comments']:
-                    values = self._format_comment_resource(comment)
-                    value_list.append(values)
-       
+        progress_bar = tqdm(total=n_comments)
+        progress_bar.set_description('Processing comments')
+        for comment_response in response_list:
+            if not 'items' in comment_response:
+                continue
+
+            for item in comment_response['items']:
+                values = self._format_comment_resource(item['snippet']['topLevelComment'])
+                value_list.append(values)
+                if 'replies' in item:
+                    for comment in item['replies']['comments']:
+                        values = self._format_comment_resource(comment)
+                        value_list.append(values)
+                progress_bar.update(1)
+
         cols = 'id,videoId,authorChannelId,publishedAt,likeCount,parentId,text'
         sql = f'INSERT OR {self.conflict_resolution} INTO comments({cols}) VALUES(?,?,?,?,?,?,?)'
-        if not value_list:
-            return
-        self.cursor.executemany(sql, value_list)
+        if value_list:
+            self.cursor.executemany(sql, value_list)
 
-
-    def _insert_videos(self, search_response):
+            
+    
+    def _insert_videos(self, response_list, n_results):
         """ Insert the collection of search results into the SQLite 'videos' table.
         
-        :param dict search_response: Response to the search request
+        :param list response_list: Responses to the search request
+        :param int n_results: Number of search results desired
+        :return: Ids of the videos inserted
+        :rtype: list
         """
-        if not 'items' in search_response:
-            return
-        
         value_list = []
-        for item in search_response['items']:
-            self._insert_channel(item['snippet']['channelId'])
-            values = (
-                item['id']['videoId'],
-                item['snippet']['channelId'],
-                str(pd.to_datetime(item['snippet']['publishedAt'])),
-                item['snippet']['title'],
-                item['snippet']['description']
-            )
-            value_list.append(values)
+        videoId_list = []
+        progress_bar = tqdm(total=n_results)
+        progress_bar.set_description('Searching videos')
+        for search_response in response_list:
+            if not 'items' in search_response:
+                continue
+
+            for item in search_response['items']:
+                self._insert_channel(item['snippet']['channelId'])
+                values = (
+                    item['id']['videoId'],
+                    item['snippet']['channelId'],
+                    str(pd.to_datetime(item['snippet']['publishedAt'])),
+                    item['snippet']['title'],
+                    item['snippet']['description']
+                )
+                value_list.append(values)
+                videoId_list.append(item['id']['videoId'])
+                progress_bar.update(1)
         
         sql = f'INSERT OR {self.conflict_resolution} INTO videos VALUES(?,?,?,?,?)'
-        if not value_list:
-            return
-        self.cursor.executemany(sql, value_list)
-
+        if value_list:
+            self.cursor.executemany(sql, value_list)
+        return videoId_list
+   
 
     def _update_emotions(self):
         """ Update the 5 emotion columns of the 'comments' table
@@ -499,7 +526,7 @@ class youtubeAnalyzer(Database):
         sql_select = """
             SELECT id, text, language
             FROM comments
-            WHERE anger IS NULL AND text IS NOT NULL LIMIT 5
+            WHERE anger IS NULL AND text IS NOT NULL
         """
         df = pd.read_sql_query(sql_select, self.conn)
         df = df[df['language'].isin(WATSON_SUPPORTED_LANG)]
@@ -541,17 +568,21 @@ class youtubeAnalyzer(Database):
 
         if not df.empty:
             key_phrases = []
-            for i in range(0, df.shape[0], 1000):
+            progress_bar = tqdm(total=df.shape[0])
+            progress_bar.set_description('Updating keywords')
+            for i in range(0, df.shape[0], AZURE_MAX_DOCUMENTS):
                 # maximum number of documents in a request: 1000
+                n_documents = AZURE_MAX_DOCUMENTS if df.shape[0] - i > AZURE_MAX_DOCUMENTS else df.shape[0] - i
                 documents = {
-                    'documents': df.iloc[i:i + 1000].to_dict('records')
+                    'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
                 response = get_key_phrases(documents, self.azureApiKey, self.azureBaseUrl)
                 if 'documents' in response:
                     key_phrases.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
-                if i + 1000 < df.shape[0]:
+                if i + AZURE_MAX_DOCUMENTS < df.shape[0]:
                     sleep(1)
+                progress_bar.update(n_documents)
 
             sql_update = 'UPDATE comments SET keywords = ? WHERE id = ?'
             values = [(','.join(elem['keyPhrases']), elem['id']) for elem in key_phrases]
@@ -566,7 +597,7 @@ class youtubeAnalyzer(Database):
             self.cursor.executemany(sql_update, values)
 
 
-    def _update_language(self):
+    def _update_languages(self):
         """ Update the 'language' column of the 'comments' table.
         """        
         sql_select = 'SELECT id, text FROM comments WHERE language IS NULL AND text IS NOT NULL'
@@ -576,18 +607,22 @@ class youtubeAnalyzer(Database):
         
         if not df.empty:
             sentiments = []
-            for i in range(0, df.shape[0], 1000):
+            progress_bar = tqdm(total=df.shape[0])
+            progress_bar.set_description('Updating languages')
+            for i in range(0, df.shape[0], AZURE_MAX_DOCUMENTS):
                 # maximum number of documents in a request: 1000
+                n_documents = AZURE_MAX_DOCUMENTS if df.shape[0] - i > AZURE_MAX_DOCUMENTS else df.shape[0] - i
                 documents = {
-                    'documents': df.iloc[i:i + 1000].to_dict('records')
+                    'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
                 response = get_languages(documents, self.azureApiKey, self.azureBaseUrl)
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
-                if i + 1000 < df.shape[0]:
+                if i + AZURE_MAX_DOCUMENTS < df.shape[0]:
                     sleep(1)
-
+                progress_bar.update(n_documents)
+            
             sql_update = 'UPDATE comments SET language = ? WHERE id = ?'
             values = [(elem['detectedLanguages'][0]['iso6391Name'], elem['id'])
                       for elem in sentiments]
@@ -600,7 +635,7 @@ class youtubeAnalyzer(Database):
         values = [(row.id,) for row in df.itertuples()]
         if values:
             self.cursor.executemany(sql_update, values)
-
+        
 
     def _update_sentiments(self):
         """ Update the 'sentimentScore' and 'sentimentLabel' columns of the 'comments' table
@@ -616,17 +651,21 @@ class youtubeAnalyzer(Database):
 
         if not df.empty:
             sentiments = []
-            for i in range(0, df.shape[0], 1000):
+            progress_bar = tqdm(total=df.shape[0])
+            progress_bar.set_description('Updating sentiments')
+            for i in range(0, df.shape[0], AZURE_MAX_DOCUMENTS):
                 # maximum number of documents in a request: 1000
+                n_documents = AZURE_MAX_DOCUMENTS if df.shape[0] - i > AZURE_MAX_DOCUMENTS else df.shape[0] - i
                 documents = {
-                    'documents': df.iloc[i:i + 1000].to_dict('records')
+                    'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
                 response = get_sentiments(documents, self.azureApiKey, self.azureBaseUrl)
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
-                if i + 1000 < df.shape[0]:
+                if i + AZURE_MAX_DOCUMENTS < df.shape[0]:
                     sleep(1)
+                progress_bar.update(n_documents)
 
             for elem in sentiments:
                 if elem['score'] < 0.4:
