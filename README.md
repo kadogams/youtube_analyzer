@@ -17,7 +17,7 @@ Also, API keys required for the following methods:
 
 ## Installation
 
-Clone the repository using the following command:
+Clone the repository at the root of your project using the following command:
 
 ```bash
 git clone --recurse-submodules https://github.com/kadogams/youtube_analyzer.git
