@@ -215,6 +215,12 @@ class youtubeAnalyzer(Database):
         IBM Watson NLU if their detected language is supported by the APIs.
         The analysis is stored in the SQLite database.
         """
+        if self.youtube == None:
+            try:
+                self._init_youtube()
+            except Exception as e:
+                print('Could not connect to the Google API Client:', e)
+                return
         self._update_languages()
         self._update_sentiments()
         self._update_keywords()
@@ -244,6 +250,7 @@ class youtubeAnalyzer(Database):
                 self._init_youtube()
             except Exception as e:
                 print('Could not connect to the Google API Client:', e)
+                return
         
         if result_order not in RESULT_ORDERS:
             raise ValueError("Valid values for the `result_order` param are '{}', "
@@ -251,7 +258,7 @@ class youtubeAnalyzer(Database):
                              .format("', '".join(RESULT_ORDERS), result_order))
 
         if comment_order not in COMMENT_ORDERS:
-            raise ValueError("Valid values for the `result_order` param are '{}', "
+            raise ValueError("Valid values for the `comment_order` param are '{}', "
                              "the given value is invalid: '{}'"
                              .format("', '".join(COMMENT_ORDERS), comment_order))
         
