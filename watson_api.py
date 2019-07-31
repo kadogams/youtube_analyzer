@@ -41,7 +41,7 @@ from ibm_watson.natural_language_understanding_v1 import Features, EmotionOption
 # %%
 
 
-def get_emotions(df, api_key, nlu_base_url):
+def get_emotions(df, nlu_api_key, nlu_base_url):
     """ Detects anger, disgust, fear, joy, or sadness that is conveyed in the contents
     from a Pandas DataFrame's 'text' column.
     
@@ -53,7 +53,7 @@ def get_emotions(df, api_key, nlu_base_url):
     """
     natural_language_understanding = NaturalLanguageUnderstandingV1(
         version='2018-11-16',
-        iam_apikey=api_key,
+        iam_apikey=nlu_api_key,
         url=nlu_base_url
     )
     
@@ -82,7 +82,7 @@ def get_emotions(df, api_key, nlu_base_url):
     return value_list
 
 
-def get_translations(df, api_key, lt_base_url):
+def get_translations(df, nlu_api_key, lt_base_url):
     """ Translate text from a Pandas DataFrame's 'text column to English.
     
     :param DataFrame df: DataFrame containing an 'id', 'text', and 'language' column
@@ -93,7 +93,7 @@ def get_translations(df, api_key, lt_base_url):
     """
     language_translator = LanguageTranslatorV3(
         version='2018-05-01',
-        iam_apikey=api_key,
+        iam_apikey=nlu_api_key,
         url=lt_base_url
     )
     
