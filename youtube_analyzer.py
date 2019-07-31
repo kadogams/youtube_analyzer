@@ -473,7 +473,7 @@ class youtubeAnalyzer(Database):
                     for comment in item['replies']['comments']:
                         values = self._format_comment_resource(comment)
                         value_list.append(values)
-                progress_bar.update(1)
+                progress_bar.update()
 
         cols = 'id,videoId,authorChannelId,publishedAt,likeCount,parentId,text'
         sql = f'INSERT OR {self.conflict_resolution} INTO comments({cols}) VALUES(?,?,?,?,?,?,?)'
@@ -509,7 +509,7 @@ class youtubeAnalyzer(Database):
                 )
                 value_list.append(values)
                 videoId_list.append(item['id']['videoId'])
-                progress_bar.update(1)
+                progress_bar.update()
         
         sql = f'INSERT OR {self.conflict_resolution} INTO videos VALUES(?,?,?,?,?)'
         if value_list:
