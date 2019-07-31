@@ -7,7 +7,7 @@
 """
 A class to make a sentiment and emotion analysis on Youtube comments.
 The analysis are saved locally in an SQLite database.
-Database schema available at 'data/sqlite_schema/sqlite_diagram.png'
+Database schema available at 'data/sqlite_schema/database_diagram.png'
 
 requirements:
  - google-api-python-client
@@ -68,7 +68,7 @@ WATSON_SUPPORTED_LANG = ['en']
 class youtubeAnalyzer(Database):
     """ A class to manage the YouTube SQLite database.
     Inherits from base class 'Database' in database.py (a wrapper around the sqlite3 python library)
-    Database schema available at 'data/sqlite_schema/sqlite_diagram.png'
+    Database schema available at 'data/sqlite_schema/database_diagram.png'
     """
 
     #################
@@ -122,7 +122,7 @@ class youtubeAnalyzer(Database):
     ##################
     
     def create_structure(self):
-        """ Create the wap SQLite database structure (cf. data/sqlite_schema/sqlite_diagram.png).
+        """ Create the wap SQLite database structure (cf. data/sqlite_schema/database_diagram.png).
         SQL 'CREATE TABLE' statements available in 'data/sqlite_schema/*_schema.txt'
         """
 
