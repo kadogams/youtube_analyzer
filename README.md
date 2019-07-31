@@ -9,7 +9,7 @@ It allows to:
 - run a sentiment analysis and key phrases extraction on them using Microsoft Azure Text Analytics API
 - run an emotion analysis using IBM Watson Natural Language Understanding API
 - store everything in a local SQLite database
-- retrieve specific data in a Panda's DataFrame
+- retrieve specific data in a Pandas DataFrame
 
 ## Requirements
 
