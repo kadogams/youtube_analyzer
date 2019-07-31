@@ -225,8 +225,8 @@ class youtubeAnalyzer(Database):
     
     def search(self, query, n_results=20, result_order='relevance',
                n_comments=100, comment_order='relevance', include_replies=False):
-        """ Search specified videos on YouTube, and update the local database accordingly
-        with a sentiment and emotion analysis on the associated comments.
+        """ Update the local SQLite database according 
+        to the specific search query on YouTube API.
         
         For more information about the search options, please refer
         to the documentation at:
