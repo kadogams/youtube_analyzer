@@ -30,7 +30,6 @@ import os
 import sys
 from time import sleep
 
-# from langdetect import detect
 import pandas as pd
 from tqdm import tqdm
 
@@ -76,16 +75,15 @@ class youtubeAnalyzer(Database):
     # Magic Methods #
     #################
 
-    def __init__(self, googleApiKey=None, azureApiKey=None, watsonApiKey=None,
-                 azureBaseUrl='https://westcentralus.api.cognitive.microsoft.com/text/analytics/v2.1/',
-                 watsonBaseUrl='https://gateway-lon.watsonplatform.net/natural-language-understanding/api',
+    def __init__(self, google_api_key=None, azure_api_key=None, azure_text_analytics_base_url=None,
+                 watson_nlu_api_key=None, watson_nlu_base_url=None,
                  conflict_resolution='IGNORE', sqlite_file='youtube.sqlite'):
         """
-        :param str googleApiKey: Developper key for Google API
-        :param str azureApiKey: Subscription key for Azure Text Analytics API
-        :param str watsonApiKey: API key for IBM Watson's Natural Language Understanding API
-        :param str azureBaseUrl: Base url for Azure Text Analytics API
-        :param str watsonBaseUrl_nlu: Base url for IBM Watson's Natural Language Understanding API
+        :param str google_api_key: Developper key for Google API
+        :param str azure_api_key: Subscription key for Azure Text Analytics API
+        :param str watson_nlu_api_key: API key for IBM Watson's Natural Language Understanding API
+        :param str azure_text_analytics_base_url : Base url for Azure Text Analytics API
+        :param str watson_nlu_base_url_nlu: Base url for IBM Watson's Natural Language Understanding API
         :param str conflict_resolution: ON CONFLICT clause for the SQLite queries. Warning: 'REPLACE' will delete the all Azure and Watson analysis.
         :param str sqlite_file: SQLite file name
         """
@@ -102,11 +100,11 @@ class youtubeAnalyzer(Database):
         self.cursor = None
         self.conflict_resolution = conflict_resolution
         
-        self.googleApiKey = googleApiKey
-        self.azureApiKey = azureApiKey
-        self.azureBaseUrl = azureBaseUrl
-        self.watsonApiKey = watsonApiKey
-        self.watsonBaseUrl = watsonBaseUrl
+        self.__google_api_key = google_api_key
+        self.__azure_api_key = azure_api_key
+        self.__azure_text_analytics_base_url = azure_text_analytics_base_url 
+        self.__watson_nlu_api_key = watson_nlu_api_key
+        self.__watson_nlu_base_url = watson_nlu_base_url
 
         try:
             self._init_youtube()
@@ -421,7 +419,7 @@ class youtubeAnalyzer(Database):
         self.youtube = build(
             api_service_name,
             api_version,
-            developerKey=self.googleApiKey
+            developerKey=self.__google_api_key
         )
     
 
@@ -537,7 +535,7 @@ class youtubeAnalyzer(Database):
                 SET anger = ?, disgust = ?, fear = ?, joy = ?, sadness = ?
                 WHERE id = ?
             """
-            values = get_emotions(df, self.watsonApiKey, self.watsonBaseUrl)
+            values = get_emotions(df, self.__watson_nlu_api_key, self.__watson_nlu_base_url)
             if values:
                 self.cursor.executemany(sql_update, values)
                 
@@ -576,7 +574,7 @@ class youtubeAnalyzer(Database):
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_key_phrases(documents, self.azureApiKey, self.azureBaseUrl)
+                response = get_key_phrases(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
                 if 'documents' in response:
                     key_phrases.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
@@ -615,7 +613,7 @@ class youtubeAnalyzer(Database):
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_languages(documents, self.azureApiKey, self.azureBaseUrl)
+                response = get_languages(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
@@ -659,7 +657,7 @@ class youtubeAnalyzer(Database):
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_sentiments(documents, self.azureApiKey, self.azureBaseUrl)
+                response = get_sentiments(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
