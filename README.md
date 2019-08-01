@@ -46,6 +46,10 @@ git clone --recurse-submodules https://github.com/kadogams/youtube_analyzer.git
 ```python
 from youtube_analyzer import youtubeAnalyzer
 
+ya = youtubeAnalyzer() # no access to the APIs
+
+#### OR ####
+
 with open('youtube_analyzer/YOUR_CREDENTIALS.json', 'r') as f:
     credentials = json.load(f)
 
@@ -57,9 +61,6 @@ ya = youtubeAnalyzer(
     watson_nlu_base_url=credentials['watson_nlu_base_url']
 )
 
-#### OR ####
-
-ya = youtubeAnalyzer()
 ```
 
 to be continued...
