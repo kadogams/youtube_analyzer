@@ -75,4 +75,3 @@ def get_sentiments(documents, subscription_key, text_analytics_base_url):
                               json=documents)
     response.raise_for_status()
     return response.json()
-
