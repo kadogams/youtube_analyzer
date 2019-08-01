@@ -221,13 +221,16 @@ class youtubeAnalyzer(Database):
             except Exception as e:
                 print('Could not connect to the Google API Client:', e)
                 return
-        self._update_languages()
-        self._update_sentiments()
-        self._update_keywords()
-        self._update_emotions()
+        try:
+            self._update_languages()\
+            and self._update_sentiments()\
+            and self._update_keywords()\
+            and self._update_emotions()
+            print('Analysis complete.')
+        except Exception as e:
+            print('An error occured while running the analysis:', e)
         self.conn.commit()
-        print('Analysis complete.')
-    
+     
     
     def search(self, query, n_results=20, result_order='relevance',
                n_comments=100, comment_order='relevance', include_replies=False):
@@ -542,7 +545,11 @@ class youtubeAnalyzer(Database):
                 SET anger = ?, disgust = ?, fear = ?, joy = ?, sadness = ?
                 WHERE id = ?
             """
+            # try:
             values = get_emotions(df, self.__watson_nlu_api_key, self.__watson_nlu_base_url)
+            # except Exception as e:
+            #     print('An error occurred while connecting to IBM NLU API': e)
+            #     return False
             if values:
                 self.cursor.executemany(sql_update, values)
                 
@@ -556,6 +563,7 @@ class youtubeAnalyzer(Database):
         values = [(row.id,) for row in df.itertuples()]
         if values:
             self.cursor.executemany(sql_update, values)
+        return True
 
 
     def _update_keywords(self):
@@ -577,11 +585,15 @@ class youtubeAnalyzer(Database):
             progress_bar.set_description('Updating keywords')
             for i in range(0, df.shape[0], AZURE_MAX_DOCUMENTS):
                 # maximum number of documents in a request: 1000
+                # try:
                 n_documents = AZURE_MAX_DOCUMENTS if df.shape[0] - i > AZURE_MAX_DOCUMENTS else df.shape[0] - i
+                # except Exception as e:
+                #     print('An error occurred while making a request to Azure Text Analytics API': e)
+                #     return False
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_key_phrases(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
+                response = get_key_phrases(documents, self.__azure_api_key, self.__azure_text_analytics_base_url)
                 if 'documents' in response:
                     key_phrases.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
@@ -600,6 +612,7 @@ class youtubeAnalyzer(Database):
         values = [(row.id,) for row in df.itertuples()]
         if values:
             self.cursor.executemany(sql_update, values)
+        return True
 
 
     def _update_languages(self):
@@ -620,7 +633,11 @@ class youtubeAnalyzer(Database):
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_languages(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
+                # try:
+                response = get_languages(documents, self.__azure_api_key, self.__azure_text_analytics_base_url)
+                # except Exception as e:
+                #     print('An error occurred while making a request to Azure Text Analytics API': e)
+                #     return False
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
@@ -640,7 +657,8 @@ class youtubeAnalyzer(Database):
         values = [(row.id,) for row in df.itertuples()]
         if values:
             self.cursor.executemany(sql_update, values)
-        
+        return True
+    
 
     def _update_sentiments(self):
         """ Update the 'sentimentScore' and 'sentimentLabel' columns of the 'comments' table
@@ -664,7 +682,11 @@ class youtubeAnalyzer(Database):
                 documents = {
                     'documents': df.iloc[i:i + n_documents].to_dict('records')
                 }
-                response = get_sentiments(documents, self.__azure_api_key, self.__azure_text_analytics_base_url  )
+                # try:
+                response = get_sentiments(documents, self.__azure_api_key, self.__azure_text_analytics_base_url)
+                # except Exception as e:
+                #     print('An error occurred while making a request to Azure Text Analytics API': e)
+                #     return False
                 if 'documents' in response:
                     sentiments.extend(response['documents'])
                 # time sleep not to exceed the API requests limit
@@ -699,3 +721,4 @@ class youtubeAnalyzer(Database):
         values = [(row.id,) for row in df.itertuples()]
         if values:
             self.cursor.executemany(sql_update, values)
+        return True
