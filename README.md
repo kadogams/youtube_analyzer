@@ -8,7 +8,7 @@ It allows to:
 - scrape the comments to videos of a search request on YouTube Data API
 - run a sentiment analysis and key phrases extraction on them using Microsoft Azure Text Analytics API
 - run an emotion analysis using IBM Watson Natural Language Understanding API
-- store everything in a local SQLite database
+- store everything in a local SQLite database (diagram available [here](https://github.com/kadogams/youtube_analyzer/blob/master/data/sqlite_schema/database_diagram.png)
 - retrieve specific data in a Pandas DataFrame
 
 ## Requirements
