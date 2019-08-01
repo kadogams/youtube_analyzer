@@ -36,6 +36,7 @@ def get_languages(documents, subscription_key, text_analytics_base_url):
     response  = requests.post(language_api_url,
                               headers=headers,
                               json=documents)
+    response.raise_for_status()
     return response.json()
 
 
@@ -53,6 +54,7 @@ def get_key_phrases(documents, subscription_key, text_analytics_base_url):
     response  = requests.post(keyPhrase_url,
                               headers=headers,
                               json=documents)
+    response.raise_for_status()
     return response.json()
     
     
@@ -66,11 +68,11 @@ def get_sentiments(documents, subscription_key, text_analytics_base_url):
     :return: Output to the API call
     :rtype: dict
     """
-    sentiments = {}
     sentiment_url = text_analytics_base_url + "sentiment"
     headers   = {"Ocp-Apim-Subscription-Key": subscription_key}
     response  = requests.post(sentiment_url,
                               headers=headers,
                               json=documents)
+    response.raise_for_status()
     return response.json()
 
