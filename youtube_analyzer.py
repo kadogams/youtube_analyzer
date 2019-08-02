@@ -340,7 +340,7 @@ class youtubeAnalyzer(Database):
             from_date = '1900-01-01 00:00:00'
         elif not to_date:
             to_date = 'now'
-        return "(contents.published BETWEEN '{}' AND '{}')".format(str(pd.to_datetime(from_date)),
+        return "(comments.publishedAt BETWEEN '{}' AND '{}')".format(str(pd.to_datetime(from_date)),
                                                                    str(pd.to_datetime(to_date)))
     
 
